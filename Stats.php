@@ -25,13 +25,46 @@ class Stats extends PluginAbstract
 	/**
 	* @var string Current version of plugin
 	*/
-	public $version = '0.0.2';
-	
+	public $version = '0.3.0';
+
+	/**
+	 * Performs install operations for plugin. Called when user clicks install
+	 * plugin in admin panel.
+	 *
+	 */
+	public function install()
+	{
+
+		$db = Registry::get('db');
+		if (!Stats::tableExists($db, 'history')) {
+			$query = "CREATE TABLE IF NOT EXISTS history (
+				id bigint(20) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+				video_id bigint(20) NOT NULL,
+				user_id bigint(20) NOT NULL,
+				timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP);";
+
+			$db->query($query);
+		}
+	}
+
+	/**
+	 * Performs uninstall operations for plugin. Called when user clicks
+	 * uninstall plugin in admin panel and prior to files being removed.
+	 *
+	 */
+	public function uninstall()
+	{
+		$db = Registry::get('db');
+		$query = "DROP TABLE IF EXISTS history;";
+		$db->query($query);
+	}
+
 	/**
 	* The plugin's gateway into codebase. Place plugin hook attachments here.
 	*/	
 	public function load(){
 			Plugin::attachEvent ( 'page.start' , array( __CLASS__ , 'setup_stats' ) );		
+			Plugin::attachFilter ( 'router.static_routes' , array( __CLASS__ , 'addPlayHistoryRoute' ) );
 	}
 
 	/**
@@ -79,7 +112,19 @@ class Stats extends PluginAbstract
 	}
 	
 
-
+/**
+	 * Add route for tracking play history
+	 * 
+	 */
+	public function addPlayHistoryRoute($routes){
+		$routes['api-video-history'] = new Route(array(
+			'path' => 'api/video/history/([0-9]+)',
+			'location' => DOC_ROOT . '/cc-content/plugins/Stats/video.history.php',
+			'mappings' => array('videoId'),
+			'name' => 'api-video-history'
+		));
+		return $routes;
+	}
 	
 	/**
 	 * Set up rows for displaying public videos.
@@ -344,5 +389,27 @@ class Stats extends PluginAbstract
 
 	}
 
+	/**
+	 * Check if a table exists in the current database.
+	 *
+	 * @param PDO $pdo PDO instance connected to a database.
+	 * @param string $table Table to search for.
+	 * @return bool TRUE if table exists, FALSE if no table found.
+	 */
+	public static function tableExists($pdo, $table)
+	{
+
+		// Try a select statement against the table
+		// Run it in try/catch in case PDO is in ERRMODE_EXCEPTION.
+		try {
+			$result = $pdo->basicQuery("SELECT 1 FROM $table LIMIT 1");
+		} catch (Exception $e) {
+			// We got an exception == table not found
+			return FALSE;
+		}
+
+		// Result is either boolean FALSE (no table found) or PDOStatement Object (table found)
+		return $result !== FALSE;
+	}
 }
 
