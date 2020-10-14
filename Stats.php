@@ -176,7 +176,7 @@ class Stats extends PluginAbstract
 	 */
 	public function display_chart($chart, $chart_var){
 		$display_chart  = '<hr><canvas id="' . $chart_var . '_canvas" width="400" height="250"></canvas>';
-		$display_chart .= "<script> var " . $chart_var . "_canvas = document.getElementById('" . $chart_var . "_canvas'); var " . $chart_var . "_chart = new Chart(" . $chart_var . "_canvas," . json_encode($chart) . "); " . $chart_var . "_chart.options.plugins.colorschemes.scheme = randomColorScheme(); " . $chart_var . "_chart.update();</script>";
+		$display_chart .= "<script> var " . $chart_var . "_canvas = document.getElementById('" . $chart_var . "_canvas'); var " . $chart_var . "_chart = new Chart(" . $chart_var . "_canvas," . json_encode($chart) . "); " . $chart_var . "_chart.options.plugins.colorschemes.scheme = 'office.Story6'; " . $chart_var . "_chart.update();</script>";
 		return $display_chart;
 	}
 	/**
