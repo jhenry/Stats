@@ -25,27 +25,104 @@ class Stats extends PluginAbstract
 	/**
 	* @var string Current version of plugin
 	*/
-	public $version = '0.0.2';
-	
+	public $version = '0.3.0';
+
+	/**
+	 * Performs install operations for plugin. Called when user clicks install
+	 * plugin in admin panel.
+	 *
+	 */
+	public function install()
+	{
+
+		$db = Registry::get('db');
+		if (!Stats::tableExists($db, 'history')) {
+			$query = "CREATE TABLE IF NOT EXISTS history (
+				id bigint(20) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+				video_id bigint(20) NOT NULL,
+				user_id bigint(20) NOT NULL,
+				timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP);";
+
+			$db->query($query);
+		}
+	}
+
+	/**
+	 * Performs uninstall operations for plugin. Called when user clicks
+	 * uninstall plugin in admin panel and prior to files being removed.
+	 *
+	 */
+	public function uninstall()
+	{
+		$db = Registry::get('db');
+		$query = "DROP TABLE IF EXISTS history;";
+		$db->query($query);
+	}
+
 	/**
 	* The plugin's gateway into codebase. Place plugin hook attachments here.
 	*/	
 	public function load(){
 			Plugin::attachEvent ( 'page.start' , array( __CLASS__ , 'setup_stats' ) );		
+			Plugin::attachFilter ( 'router.static_routes' , array( __CLASS__ , 'addPlayHistoryRoute' ) );
+			Plugin::attachEvent ( 'videos.watch.player.end' , array( __CLASS__ , 'loadPlayCountTracker' ) );		
+	}
+
+	/**
+	 * Add route for tracking play history
+	 * 
+	 */
+	public static function addPlayHistoryRoute($routes)
+	{
+		$routes['api-video-history'] = new Route(array(
+			'path' => 'api/video/history/([0-9]+)',
+			'location' => DOC_ROOT . '/cc-content/plugins/Stats/video.history.php',
+			'mappings' => array('videoId'),
+			'name' => 'api-video-history'
+		));
+		return $routes;
+	}
+
+	/**
+	 * Add jwplayer call in order to record activity on video plays
+	 * 
+	 */
+	public static function loadPlayCountTracker($mediaspace, $video)
+	{
+		$player = "<script> 
+		player" . $mediaspace . ".once('play', function(event) {
+			var r=$.get('" . BASE_URL . "/api/video/history/" . $video->videoId . "');
+		});
+		</script>";
+		echo $player;
+	}
+
+	/**
+	 * Add history/plays to the default pageview counts
+	 * 
+	 */
+	public static function countPlays($video)
+	{
+		$plays = 0;
+		include_once "HistoryMapper.php";
+		$historyMapper = new \HistoryMapper();
+		$histories = $historyMapper->getMultipleByCustom(array('video_id' => $video->videoId));
+		if ($histories) {
+			$plays = sizeof($histories);
+		}
+		return $plays;
 	}
 
 	/**
 	 * Load data and display libraries into the head element.
 	 * 
 	 */
-	public function load_display_libraries(){
+	public static function load_display_libraries(){
 		$libraries = file_get_contents(dirname(__FILE__) . '/head.html');
 		
 		// Recycle current library assets for download buttons.
 		$bootstrap_css = '<link rel="stylesheet" type="text/css" href="' . HOST . '/cc-admin/extras/bootstrap-3.3.4/css/bootstrap.min.css">';
 		echo $bootstrap_css . "\n" . $libraries;
-		
-	
 	}
 	/**
 	 * The view hook replaces the body content, so let's add that back in.
@@ -53,7 +130,7 @@ class Stats extends PluginAbstract
 	 * so it can be placed at the top of the body.
 	 * 
 	 */
-	public function get_page_content(){
+	public static function get_page_content(){
 		
 		$page_mapper = new PageMapper();
 		$stats_page = Settings::get('stats_page');
@@ -66,7 +143,7 @@ class Stats extends PluginAbstract
 	 * Insert the DOM element into the body for table population.
 	 * 
 	 */
-	public function load_reports(){
+	public static function load_reports(){
 		
 		$page = Stats::get_page_content();
 		
@@ -79,7 +156,6 @@ class Stats extends PluginAbstract
 	}
 	
 
-
 	
 	/**
 	 * Set up rows for displaying public videos.
@@ -87,7 +163,7 @@ class Stats extends PluginAbstract
 	 * var string report_var_prefix A prefix to name Javascript and HTML elements/vars with. 
 	 * 
 	 */
-	public function public_video_report($report_var_prefix = "public_videos"){
+	public static function public_video_report($report_var_prefix = "public_videos"){
 
 		$videoMapper = new VideoMapper();
 		$videoService = new VideoService();
@@ -119,7 +195,7 @@ class Stats extends PluginAbstract
 	 * Build table navigation buttons for download, etc.
 	 * 
 	 */
-	public function build_table_nav($id){
+	public static function build_table_nav($id){
 		$nav =  '<ul class="nav nav-tabs" >';
 		$nav .=	'	<li><a data-tablename="' . $id . '" class="download-table-csv" href="#" id="' . $id . '-csv">Download CSV</a></li>';
 		$nav .=	'	<li><a data-tablename="' . $id . '" class="download-table-xlsx" href="#" id="' . $id . '-xlsx">Download Excel (.xlsx)</a></li>';
@@ -133,7 +209,7 @@ class Stats extends PluginAbstract
 	 * Check location and access, and call the appropriate hooks.
 	 * 
 	 */
-	public function setup_stats(){
+	public static function setup_stats(){
 		if( Stats::verify_access() ) {
 			Plugin::attachEvent ( 'theme.head' , array( __CLASS__ , 'load_display_libraries' ) );		
 			Plugin::attachFilter ( 'view.render_body' , array( __CLASS__ , 'load_reports' ) );		
@@ -144,7 +220,7 @@ class Stats extends PluginAbstract
 	 * Uploads per month
 	 * 
 	 */
-	public function report_uploads_by_month(){
+	public static function report_uploads_by_month(){
 		$query = 'SELECT COUNT(video_id) as uploads, DATE_FORMAT(date_created, "%Y-%m") as date from videos group by date;';
 		$db = Registry::get('db');
 		$results = $db->basicQuery($query);
@@ -174,7 +250,7 @@ class Stats extends PluginAbstract
 	 * Chart display DOM and Javascript elements.
 	 * 
 	 */
-	public function display_chart($chart, $chart_var){
+	public static function display_chart($chart, $chart_var){
 		$display_chart  = '<hr><canvas id="' . $chart_var . '_canvas" width="400" height="250"></canvas>';
 		$display_chart .= "<script> var " . $chart_var . "_canvas = document.getElementById('" . $chart_var . "_canvas'); var " . $chart_var . "_chart = new Chart(" . $chart_var . "_canvas," . json_encode($chart) . "); " . $chart_var . "_chart.options.plugins.colorschemes.scheme = 'office.Story6'; " . $chart_var . "_chart.update();</script>";
 		return $display_chart;
@@ -183,7 +259,7 @@ class Stats extends PluginAbstract
 	 * Running total of uploads per month, from beginning of time.
 	 * 
 	 */
-	public function report_cumulative_uploads_by_month(){
+	public static function report_cumulative_uploads_by_month(){
 		$query = 'SELECT d.date,
 			@running_sum:=@running_sum + d.count AS uploads
 				FROM (  SELECT DATE_FORMAT(date_created, "%Y-%m") as date, COUNT(videos.video_id) AS `count`
@@ -218,7 +294,7 @@ class Stats extends PluginAbstract
 	 * Make sure they are in the right place with the correct permissions.
 	 * 
 	 */
-	public function verify_access(){
+	public static function verify_access(){
 		// Retrieve settings from database
 		$stats_page = Settings::get('stats_page');
 		
@@ -241,7 +317,7 @@ class Stats extends PluginAbstract
 	 * Get current page id.
 	 * 
 	 */
-	public function get_current_page(){
+	public static function get_current_page(){
 		$router = new Router();
 		$pageMapper = new PageMapper();
 		if (!empty($_GET['preview']) && is_numeric($_GET['preview'])) {
@@ -309,7 +385,7 @@ class Stats extends PluginAbstract
 	 * Check for form errors and save settings
 	 * 
 	 */
-	private function _handle_settings_form($data, $errors){
+	private static function _handle_settings_form($data, $errors){
 		if (empty($errors)) {
 			foreach ($data as $key => $value) {
 				Settings::set($key, $value);
@@ -327,7 +403,7 @@ class Stats extends PluginAbstract
 	 * Validate settings form nonce token and submission speed
 	 * 
 	 */
-	private function _validate_form_nonce(){
+	private static function _validate_form_nonce(){
 		if (
 				!empty($_POST['nonce'])
 				&& !empty($_SESSION['formNonce'])
@@ -344,5 +420,27 @@ class Stats extends PluginAbstract
 
 	}
 
+	/**
+	 * Check if a table exists in the current database.
+	 *
+	 * @param PDO $pdo PDO instance connected to a database.
+	 * @param string $table Table to search for.
+	 * @return bool TRUE if table exists, FALSE if no table found.
+	 */
+	public static function tableExists($pdo, $table)
+	{
+
+		// Try a select statement against the table
+		// Run it in try/catch in case PDO is in ERRMODE_EXCEPTION.
+		try {
+			$result = $pdo->basicQuery("SELECT 1 FROM $table LIMIT 1");
+		} catch (Exception $e) {
+			// We got an exception == table not found
+			return FALSE;
+		}
+
+		// Result is either boolean FALSE (no table found) or PDOStatement Object (table found)
+		return $result !== FALSE;
+	}
 }
 
