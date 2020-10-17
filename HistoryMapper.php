@@ -19,7 +19,7 @@ class HistoryMapper extends MapperAbstract
     $history->historyId = (int) $record['id'];
     $history->videoId = (int) $record['video_id'];
     $history->userId = (int) $record['user_id'];
-    $history->timeStamp = new \DateTime($record['date_created'], new \DateTimeZone('UTC'));
+    $history->timeStamp = new \DateTime($record['timestamp'], new \DateTimeZone('UTC'));
     return $history;
   }
 
