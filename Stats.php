@@ -66,6 +66,8 @@ class Stats extends PluginAbstract
 			Plugin::attachEvent ( 'page.start' , array( __CLASS__ , 'setup_stats' ) );		
 			Plugin::attachFilter ( 'router.static_routes' , array( __CLASS__ , 'addPlayHistoryRoute' ) );
 			Plugin::attachEvent ( 'videos.watch.player.end' , array( __CLASS__ , 'loadPlayCountTracker' ) );		
+      
+			Plugin::attachEvent ( 'theme.head.end' , array( __CLASS__ , 'loadAnalyticsCode' ) );		
 	}
 
 	/**
@@ -111,6 +113,16 @@ class Stats extends PluginAbstract
 			$plays = sizeof($histories);
 		}
 		return $plays;
+	}
+
+	/**
+	 * Load analytics code into the head hook if present.
+	 * 
+	 */
+	public static function loadAnalyticsCode()
+	{
+      $code = Settings::get('stats_analytics_code');
+      echo $code;
 	}
 
 	/**
@@ -340,6 +352,7 @@ class Stats extends PluginAbstract
 
 		// Retrieve settings from database
 		$data['stats_page'] = Settings::get('stats_page');
+		$data['stats_analytics_code'] = Settings::get('stats_analytics_code');
 
 		// Handle form if submitted
 		if (isset($_POST['submitted'])) {
@@ -352,6 +365,9 @@ class Stats extends PluginAbstract
 				} else {
 					$errors['stats_page'] = "Invalid page ID selected: " . $_POST['stats_page'] . ". ";
 				}
+                
+                // Set analytics code   
+                $data['stats_analytics_code'] = $_POST['stats_analytics_code'];
 
 			}
 			else {

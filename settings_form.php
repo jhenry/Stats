@@ -14,6 +14,11 @@
 	    <?php endforeach; ?>
 	    </select>
     </div>
+    <div class="form-group">
+      <label for="stats_analytics">Analytics Code: </label>
+<p>Place your Google Analytics, Matomo/Piwik or similar code here to be inserted at the bottom of the head tag.</p>
+      <textarea class="form-control" id="stats_analytics" name="stats_analytics_code" style="width: 90%;" rows="10"><?= $data['stats_analytics_code']; ?></textarea>
+    </div>
 
     <input type="hidden" value="yes" name="submitted" />
     <input type="hidden" name="nonce" value="<?=$formNonce?>" />
